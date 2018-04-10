@@ -7,8 +7,8 @@ import torch.utils.data as data
 import torchvision.transforms as transforms
 import cv2
 import numpy as np
-
-COCO_ROOT = osp.join(HOME, 'data/coco/')
+HOME = '/media/zh/E/ssd.pytorch'
+COCO_ROOT = osp.join(HOME, 'data')
 IMAGES = 'images'
 ANNOTATIONS = 'annotations'
 COCO_API = 'PythonAPI'
