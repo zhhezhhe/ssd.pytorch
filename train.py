@@ -19,6 +19,7 @@ import argparse
 def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
 
+VOC_ROOT = '/home/store-1-img/VOC2007/VOCdevkit/VOC2007'
 
 parser = argparse.ArgumentParser(
     description='Single Shot MultiBox Detector Training With Pytorch')
@@ -35,7 +36,7 @@ parser.add_argument('--resume', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
 parser.add_argument('--start_iter', default=0, type=int,
                     help='Resume training at this iter')
-parser.add_argument('--num_workers', default=4, type=int,
+parser.add_argument('--num_workers', default=30, type=int,
                     help='Number of workers used in dataloading')
 parser.add_argument('--cuda', default=True, type=str2bool,
                     help='Use CUDA to train model')
