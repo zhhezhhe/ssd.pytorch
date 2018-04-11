@@ -19,14 +19,13 @@ import argparse
 def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
 
-VOC_ROOT = '/home/store-1-img/VOC2007/VOCdevkit/VOC2007'
 
 parser = argparse.ArgumentParser(
     description='Single Shot MultiBox Detector Training With Pytorch')
 train_set = parser.add_mutually_exclusive_group()
-parser.add_argument('--dataset', default='VOC', choices=['VOC', 'COCO'],
+parser.add_argument('--dataset', default='EBEST', choices=['VOC', 'COCO', 'EBEST'],
                     type=str, help='VOC or COCO')
-parser.add_argument('--dataset_root', default=VOC_ROOT,
+parser.add_argument('--dataset_root', default=EBEST_ROOT,
                     help='Dataset root directory path')
 parser.add_argument('--basenet', default='vgg16_reducedfc.pth',
                     help='Pretrained base model')
@@ -36,7 +35,7 @@ parser.add_argument('--resume', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
 parser.add_argument('--start_iter', default=0, type=int,
                     help='Resume training at this iter')
-parser.add_argument('--num_workers', default=30, type=int,
+parser.add_argument('--num_workers', default=4, type=int,
                     help='Number of workers used in dataloading')
 parser.add_argument('--cuda', default=True, type=str2bool,
                     help='Use CUDA to train model')
@@ -88,10 +87,46 @@ def train():
         dataset = VOCDetection(root=args.dataset_root,
                                transform=SSDAugmentation(cfg['min_dim'],
                                                          MEANS))
+    elif args.dataset == 'EBEST':
+        if args.dataset_root == COCO_ROOT:
+            parser.error('Must specify dataset if specifying dataset_root')
+        cfg = ebest
+        dataset = EBESTDetection(root=args.dataset_root,
+                               transform=SSDAugmentation(cfg['min_dim'],
+                                                         MEANS))
 
     if args.visdom:
         import visdom
         viz = visdom.Visdom()
+
+        def create_vis_plot(_xlabel, _ylabel, _title, _legend):
+            return viz.line(
+                X=torch.zeros((1,)).cpu(),
+                Y=torch.zeros((1, 3)).cpu(),
+                opts=dict(
+                    xlabel=_xlabel,
+                    ylabel=_ylabel,
+                    title=_title,
+                    legend=_legend
+                )
+            )
+
+        def update_vis_plot(iteration, loc, conf, window1, window2, update_type,
+                            epoch_size=1):
+            viz.line(
+                X=torch.ones((1, 3)).cpu() * iteration,
+                Y=torch.Tensor([loc, conf, loc + conf]).unsqueeze(0).cpu() / epoch_size,
+                win=window1,
+                update=update_type
+            )
+            # initialize epoch plot on first iteration
+            if iteration == 0:
+                viz.line(
+                    X=torch.zeros((1, 3)).cpu(),
+                    Y=torch.Tensor([loc, conf, loc + conf]).unsqueeze(0).cpu(),
+                    win=window2,
+                    update=True
+                )
 
     ssd_net = build_ssd('train', cfg['min_dim'], cfg['num_classes'])
     net = ssd_net
@@ -163,7 +198,12 @@ def train():
             adjust_learning_rate(optimizer, args.gamma, step_index)
 
         # load train data
-        images, targets = next(batch_iterator)
+        # images, targets = next(batch_iterator)
+        try:
+            images, targets = next(batch_iterator)
+        except StopIteration:
+            batch_iterator = iter(data_loader)
+            images, targets = next(batch_iterator)
 
         if args.cuda:
             images = Variable(images.cuda())
@@ -221,35 +261,7 @@ def weights_init(m):
         m.bias.data.zero_()
 
 
-def create_vis_plot(_xlabel, _ylabel, _title, _legend):
-    return viz.line(
-        X=torch.zeros((1,)).cpu(),
-        Y=torch.zeros((1, 3)).cpu(),
-        opts=dict(
-            xlabel=_xlabel,
-            ylabel=_ylabel,
-            title=_title,
-            legend=_legend
-        )
-    )
 
-
-def update_vis_plot(iteration, loc, conf, window1, window2, update_type,
-                    epoch_size=1):
-    viz.line(
-        X=torch.ones((1, 3)).cpu() * iteration,
-        Y=torch.Tensor([loc, conf, loc + conf]).unsqueeze(0).cpu() / epoch_size,
-        win=window1,
-        update=update_type
-    )
-    # initialize epoch plot on first iteration
-    if iteration == 0:
-        viz.line(
-            X=torch.zeros((1, 3)).cpu(),
-            Y=torch.Tensor([loc, conf, loc + conf]).unsqueeze(0).cpu(),
-            win=window2,
-            update=True
-        )
 
 
 if __name__ == '__main__':

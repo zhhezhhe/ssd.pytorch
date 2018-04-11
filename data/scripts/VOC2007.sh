@@ -32,9 +32,6 @@ echo "Extracting trainval ..."
 tar -xvf VOCtrainval_06-Nov-2007.tar
 echo "Extracting test ..."
 tar -xvf VOCtest_06-Nov-2007.tar
-echo "removing tars ..."
-rm VOCtrainval_06-Nov-2007.tar
-rm VOCtest_06-Nov-2007.tar
 
 end=`date +%s`
 runtime=$((end-start))

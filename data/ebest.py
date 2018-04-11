@@ -12,24 +12,30 @@ import torch
 import torch.utils.data as data
 import cv2
 import numpy as np
+import json
+import os
 if sys.version_info[0] == 2:
     import xml.etree.cElementTree as ET
 else:
     import xml.etree.ElementTree as ET
 
-VOC_CLASSES = (  # always index 0
-    'aeroplane', 'bicycle', 'bird', 'boat',
-    'bottle', 'bus', 'car', 'cat', 'chair',
-    'cow', 'diningtable', 'dog', 'horse',
-    'motorbike', 'person', 'pottedplant',
-    'sheep', 'sofa', 'train', 'tvmonitor')
+
+classname2bottle_map = '/home/store-1-img/Datasets/eBest_cola/EBest_Cocacola/classname2bottle_map.json'
+with open(classname2bottle_map, 'r') as f:
+    EBEST_CLASSES = json.load(f)
+# EBEST_CLASSES = (  # always index 0
+#     'aeroplane', 'bicycle', 'bird', 'boat',
+#     'bottle', 'bus', 'car', 'cat', 'chair',
+#     'cow', 'diningtable', 'dog', 'horse',
+#     'motorbike', 'person', 'pottedplant',
+#     'sheep', 'sofa', 'train', 'tvmonitor')
 
 # note: if you used our download scripts, this should be right
 # VOC_ROOT = osp.join(HOME, "data/VOCdevkit/")
-VOC_ROOT = '/home/store-1-img/VOC2007/VOCdevkit'
+EBEST_ROOT = '/home/store-1-img/Datasets/eBest_cola/EBest_Cocacola/20180205130917_export_part0-of-3'
 
 
-class VOCAnnotationTransform(object):
+class EBESTAnnotationTransform(object):
     """Transforms a VOC annotation into a Tensor of bbox coords and label index
     Initilized with a dictionary lookup of classnames to indexes
 
@@ -43,8 +49,8 @@ class VOCAnnotationTransform(object):
     """
 
     def __init__(self, class_to_ind=None, keep_difficult=False):
-        self.class_to_ind = class_to_ind or dict(
-            zip(VOC_CLASSES, range(len(VOC_CLASSES))))
+        # self.class_to_ind = class_to_ind or dict(
+        #     zip(EBEST_CLASSES, range(len(EBEST_CLASSES))))
         self.keep_difficult = keep_difficult
 
     def __call__(self, target, width, height):
@@ -70,7 +76,8 @@ class VOCAnnotationTransform(object):
                 # scale height or width
                 cur_pt = cur_pt / width if i % 2 == 0 else cur_pt / height
                 bndbox.append(cur_pt)
-            label_idx = self.class_to_ind[name]
+            # label_idx = self.class_to_ind[name]
+            label_idx = 0
             bndbox.append(label_idx)
             res += [bndbox]  # [xmin, ymin, xmax, ymax, label_ind]
             # img_id = target.find('filename').text[:-4]
@@ -78,7 +85,7 @@ class VOCAnnotationTransform(object):
         return res  # [[xmin, ymin, xmax, ymax, label_ind], ... ]
 
 
-class VOCDetection(data.Dataset):
+class EBESTDetection(data.Dataset):
     """VOC Detection Dataset Object
 
     input is image, target is annotation
@@ -96,21 +103,20 @@ class VOCDetection(data.Dataset):
     """
 
     def __init__(self, root,
-                 image_sets=[('2007', 'trainval'), ('2012', 'trainval')],
-                 transform=None, target_transform=VOCAnnotationTransform(),
-                 dataset_name='VOC0712'):
+                 transform=None, target_transform=EBESTAnnotationTransform(),
+                 dataset_name='EBEST'):
         self.root = root
-        self.image_set = image_sets
         self.transform = transform
         self.target_transform = target_transform
         self.name = dataset_name
-        self._annopath = osp.join('%s', 'Annotations', '%s.xml')
-        self._imgpath = osp.join('%s', 'JPEGImages', '%s.jpg')
+        self._annopath = '%s.xml'
+        self._imgpath = '%s.jpg'
         self.ids = list()
-        for (year, name) in image_sets:
-            rootpath = osp.join(self.root, 'VOC' + year)
-            for line in open(osp.join(rootpath, 'ImageSets', 'Main', name + '.txt')):
-                self.ids.append((rootpath, line.strip()))
+
+        dirs = os.listdir(root)
+        for x in dirs:
+            if x.endswith('.jpg'):
+                self.ids.append((root, x[:-4]))
 
     def __getitem__(self, index):
         im, gt, h, w = self.pull_item(index)
@@ -122,10 +128,17 @@ class VOCDetection(data.Dataset):
 
     def pull_item(self, index):
         img_id = self.ids[index]
+        try:
+            target = ET.parse(self._annopath % img_id).getroot()
+            img = cv2.imread(self._imgpath % img_id)
 
-        target = ET.parse(self._annopath % img_id).getroot()
-        img = cv2.imread(self._imgpath % img_id)
-        height, width, channels = img.shape
+            height, width, channels = img.shape
+        except:
+            random = '/home/store-1-img/Datasets/eBest_cola/EBest_Cocacola/20180205130917_export_part0-of-3/53e5e37705a711e89cdb00163e0028a9'
+            target = ET.parse(random+'.xml').getroot()
+            img = cv2.imread(random+ '.jpg')
+
+            height, width, channels = img.shape
 
         if self.target_transform is not None:
             target = self.target_transform(target, width, height)
